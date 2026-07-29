@@ -50,13 +50,12 @@ if st.button("🎬 Cut & Download Clip", type="primary", use_container_width=Tru
             output_filename = f"clip_{unique_id}.mp4"
             output_path = os.path.join(DOWNLOAD_FOLDER, output_filename)
             
-            # Safe Downloading via yt-dlp native section downloader
+            # Smart iOS Client Emulation to bypass 403 Forbidden
             cmd = [
                 "yt-dlp",
                 "--download-sections", f"*{start_t}-{end_t}",
-                "--force-keyframes-at-cuts",
-                "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-                "--extractor-args", "youtube:player_client=android,web",
+                "-f", "mp4/best",
+                "--extractor-args", "youtube:player_client=ios",
                 "--force-overwrites",
                 "-o", output_path,
                 url
