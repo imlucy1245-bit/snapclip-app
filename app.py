@@ -23,35 +23,50 @@ def clean_time(t_str):
         return f"{parts[0]}:{parts[1]}:{parts[2]}"
     return "00:00:00"
 
-def clean_url(url):
-    return url.split('?si=')[0].split('&')[0].strip()
+def normalize_youtube_url(url):
+    """ہر قسم کے یوٹیوب لنک (youtu.be یا youtube.com) کو سٹینڈرڈ لنک میں بدلنا"""
+    url = url.strip()
+    # If it's a short link (youtu.be)
+    if "youtu.be/" in url:
+        video_id = url.split("youtu.be/")[1].split("?")[0].split("&")[0]
+        return f"https://www.youtube.com/watch?v={video_id}"
+    # If it's a regular link with parameters
+    elif "watch?v=" in url:
+        video_id = url.split("watch?v=")[1].split("&")[0].split("?")[0]
+        return f"https://www.youtube.com/watch?v={video_id}"
+    return url
 
 def get_cobalt_stream(video_url):
-    """Cobalt API کے ذریعے ویڈیو اسٹریم کا لنک حاصل کرنا"""
+    """Cobalt API کے مختلف سرورز سے سٹریمنگ لنک حاصل کرنا"""
     instances = [
-        "https://api.cobalt.tools/api/json",
-        "https://cobalt.qtf.tw/api/json",
-        "https://co.wuk.sh/api/json"
+        "https://api.cobalt.tools",
+        "https://cobalt.qtf.tw",
+        "https://co.wuk.sh",
+        "https://api.wuk.sh"
     ]
     
     headers = {
         "Accept": "application/json",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
     }
     
     payload = {
         "url": video_url,
-        "videoQuality": "720"
+        "videoQuality": "720",
+        "youtubeVideoCodec": "h264"
     }
     
     for instance in instances:
         try:
-            resp = requests.post(instance, json=payload, headers=headers, timeout=10)
+            resp = requests.post(f"{instance}/api/json", json=payload, headers=headers, timeout=12)
             if resp.status_code == 200:
                 data = resp.json()
                 if "url" in data:
                     return data["url"]
                 elif data.get("status") == "redirect":
+                    return data["url"]
+                elif data.get("status") == "tunnel":
                     return data["url"]
         except Exception:
             continue
@@ -74,22 +89,22 @@ if st.button("🎬 Cut & Download Clip", type="primary", use_container_width=Tru
     if not video_url_input:
         st.warning("براہ کرم پہلے ویڈیو کا لنک درج کریں!")
     else:
-        with st.spinner("Cobalt API کے ذریعے ویڈیو اسٹریم حاصل کی جا رہی ہے..."):
-            url = clean_url(video_url_input)
+        with st.spinner("ویڈیو لنک پروسیس ہو رہا ہے..."):
+            clean_url = normalize_youtube_url(video_url_input)
             start_t = clean_time(start_time)
             end_t = clean_time(end_time)
             
-            # 1. API سے لنک لیں
-            stream_url = get_cobalt_stream(url)
+            # 1. API سے سٹریمنگ لنک حاصل کریں
+            stream_url = get_cobalt_stream(clean_url)
             
             if not stream_url:
-                st.error("ویڈیو اسٹریم حاصل نہیں ہو سکی! لنک دوبارہ چیک کریں یا دوسری ویڈیو ٹرائی کریں۔")
+                st.error("ویڈیو اسٹریم حاصل نہیں ہو سکی! ویڈیو لنک کو ایک بار براؤزر سے کاپی کر کے دوبارہ کوشش کریں۔")
             else:
                 unique_id = uuid.uuid4().hex[:8]
                 output_filename = f"clip_{unique_id}.mp4"
                 output_path = os.path.join(DOWNLOAD_FOLDER, output_filename)
                 
-                # 2. FFmpeg کے ذریعے کلپ کاٹیں
+                # 2. FFmpeg سے ویڈیو کلپ کٹ کریں
                 cmd = [
                     "ffmpeg",
                     "-ss", start_t,
