@@ -41,26 +41,30 @@ if st.button("🎬 Cut & Download Clip", type="primary", use_container_width=Tru
     if not video_url_input:
         st.warning("براہ کرم پہلے ویڈیو کا لنک درج کریں!")
     else:
-        with st.spinner("ویڈیو پروسیس ہو رہی ہے، براہ کرم انتظار کریں..."):
+        with st.spinner("یوٹیوب سے ڈیٹا فیچ اور پروسیس کیا جا رہا ہے..."):
             url = clean_url(video_url_input)
             start_t = clean_time(start_time)
             end_t = clean_time(end_time)
             
-            output_filename = f"clip_{uuid.uuid4().hex[:8]}.mp4"
+            unique_id = uuid.uuid4().hex[:8]
+            output_filename = f"clip_{unique_id}.mp4"
             output_path = os.path.join(DOWNLOAD_FOLDER, output_filename)
             
-            # Optimized yt-dlp command
+            # Safe Downloading via yt-dlp native section downloader
             cmd = [
                 "yt-dlp",
                 "--download-sections", f"*{start_t}-{end_t}",
-                "-f", "best[ext=mp4]/best",
+                "--force-keyframes-at-cuts",
+                "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+                "--extractor-args", "youtube:player_client=android,web",
                 "--force-overwrites",
                 "-o", output_path,
                 url
             ]
             
             try:
-                subprocess.run(cmd, capture_output=True, text=True, check=True)
+                result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+                
                 if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
                     st.success("ویڈیو کامیابی سے کٹ ہو گئی ہے! 🎉")
                     st.video(output_path)
@@ -76,7 +80,8 @@ if st.button("🎬 Cut & Download Clip", type="primary", use_container_width=Tru
                 else:
                     st.error("فائل بنانے میں ناکامی ہوئی۔")
             except subprocess.CalledProcessError as e:
-                st.error(f"پروسیسنگ میں مسئلہ: {e.stderr if e.stderr else str(e)}")
+                error_log = e.stderr if e.stderr else str(e)
+                st.error(f"پروسیسنگ میں مسئلہ: {error_log[-300:]}")
             except Exception as e:
                 st.error(f"خرابی: {str(e)}")
-                    
+                
