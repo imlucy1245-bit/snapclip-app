@@ -22,11 +22,14 @@ def clean_time(t_str):
         return f"{parts[0]}:{parts[1]}:{parts[2]}"
     return "00:00:00"
 
+def clean_url(url):
+    return url.split('?si=')[0].split('&')[0].strip()
+
 st.title("✂️ SnapClip HD")
 st.caption("یوٹیوب کی کسی بھی ویڈیو کا مخصوص حصہ کٹ کریں اور ڈاؤن لوڈ کریں!")
 
 # Input fields
-video_url = st.text_input("YouTube Video Link", placeholder="https://www.youtube.com/watch?v=...")
+video_url_input = st.text_input("YouTube Video Link", placeholder="https://www.youtube.com/watch?v=...")
 
 col1, col2 = st.columns(2)
 with col1:
@@ -35,24 +38,25 @@ with col2:
     end_time = st.text_input("End Time (HH:MM:SS)", value="00:00:15")
 
 if st.button("🎬 Cut & Download Clip", type="primary", use_container_width=True):
-    if not video_url:
+    if not video_url_input:
         st.warning("براہ کرم پہلے ویڈیو کا لنک درج کریں!")
     else:
         with st.spinner("ویڈیو پروسیس ہو رہی ہے، براہ کرم انتظار کریں..."):
+            url = clean_url(video_url_input)
             start_t = clean_time(start_time)
             end_t = clean_time(end_time)
             
             output_filename = f"clip_{uuid.uuid4().hex[:8]}.mp4"
             output_path = os.path.join(DOWNLOAD_FOLDER, output_filename)
             
-            # yt-dlp command
+            # Optimized yt-dlp command
             cmd = [
                 "yt-dlp",
                 "--download-sections", f"*{start_t}-{end_t}",
-                "-f", "b[ext=mp4]/best[ext=mp4]/best",
+                "-f", "best[ext=mp4]/best",
                 "--force-overwrites",
                 "-o", output_path,
-                video_url.strip()
+                url
             ]
             
             try:
@@ -71,6 +75,8 @@ if st.button("🎬 Cut & Download Clip", type="primary", use_container_width=Tru
                         )
                 else:
                     st.error("فائل بنانے میں ناکامی ہوئی۔")
+            except subprocess.CalledProcessError as e:
+                st.error(f"پروسیسنگ میں مسئلہ: {e.stderr if e.stderr else str(e)}")
             except Exception as e:
                 st.error(f"خرابی: {str(e)}")
-          
+                    
